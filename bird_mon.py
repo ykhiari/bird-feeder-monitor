@@ -3,12 +3,14 @@ import sys
 import argparse
 import time
 import imutils
+import cv2
 import numpy as np
 from scripts import keyclipwriter
 
 # importing the configuration from the config file
 with open("config/mog.json") as jsonfile:
     conf = json.load(jsonfile)
+
 
 # define a function to handle the interruption signal
 def signal_handler(sig, frame):
@@ -20,9 +22,12 @@ def signal_handler(sig, frame):
     # exit the script
     sys.exit(0)
 
+
 # define an argument parser for the script
 parser = argparse.ArgumentParser()
-parser.add_argument("--video",type=str,help="path to optional input video file")
+parser.add_argument("--video",
+                    type=str,
+                    help="path to optional input video file")
 args = vars(parser.parse_args())
 
 # defining the video streamer
@@ -54,7 +59,7 @@ dkernel = np.ones(tuple(conf["dilate"]["kernel"], "uint8"))
 # initialize the key clip writer
 # initialize the number of frame without motion
 # initialize the number of frame since the last snpshot was written
-kcw = KeyClipWriter(bufSize=conf["keyclipwriter_buffersize"])
+kcw = keyclipwriter.KeyClipWriter(bufSize=conf["keyclipwriter_buffersize"])
 frameWithoutMotion = 0
 frameSinceSnap = 0
 
@@ -68,20 +73,21 @@ while True:
     if fullframe is None:
         print("The streaming has ended.")
         break
-    fullframe = fullframe[1] if args.get("video",False) else fullframe
+    fullframe = fullframe[1] if args.get("video", False) else fullframe
     frameSinceSnap += 1
-    frame = imutils.resize(fullframe,width=500)
+    frame = imutils.resize(fullframe, width=500)
     mask = fgbg.apply(frame)
-    mask = cv2.erode(mask,ekernel,iterations=conf["erode"]["iterations"])
-    mask = cv2.dilate(mask,dkernel,iterations=conf["dilate"]["iterations"])
-    cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    mask = cv2.erode(mask, ekernel, iterations=conf["erode"]["iterations"])
+    mask = cv2.dilate(mask, dkernel, iterations=conf["dilate"]["iterations"])
+    cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
+                            cv2.CHAIN_APPROX_SIMPLE)
     cnts = imutils.grab_contours(cnts)
     motionThisFrame = False
 
     for c in cnts:
-        ((x,y), radius) = cv2.minEnclosingCircle(c)
+        ((x, y), radius) = cv2.minEnclosingCircle(c)
         (rx, ry, rw, rh) = cv2.boundingRect(c)
-        (x,y,radius) = [int(v) for v in (x,y,radius)]
+        (x, y, radius) = [int(v) for v in (x, y, radius)]
         if radius < conf["min_radius"]:
             continue
         timestamp = datetime.datetime.now()
@@ -89,7 +95,24 @@ while True:
         motionThisFrame = True
         frameWithoutMotion = 0
         if conf["annotate"]:
-            cv2.circle(frame, (x,y), radius, (0,0,255), 2)
-            cv2.rectangle(frame, (rx,ry),(rx+rw,ry+rh),(0,255,0),2)
+            cv2.circle(frame, (x, y), radius, (0, 0, 255), 2)
+            cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (0, 255, 0), 2)
+        if not kcw.recording:
+            videoPath = os.path.sep.join(conf["output_path"], timestring)
+            fourcc = cv2.VideoWriter(*conf["codec"])
+            kcw.start(f"{videoPath}.avi", fourcc, conf["fps"])
+    if not motionThisFrame:
+        frameWithoutMotion += 1
+    kcw.update(frame)
+    noMotion = frameWithoutMotion >= conf["keyclipwriter_buffersize"]
+    if kcw.recording and noMotion:
+        kcw.finish()
+    if conf["display"]:
+        cv2.imshow("Frame", frame)
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
+            break
+if kcw.recording:
+    kcw.finish()
 
-
+cap.stop() if args.get("video", False) else cap.release()

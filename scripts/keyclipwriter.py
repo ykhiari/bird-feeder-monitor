@@ -40,7 +40,7 @@ class KeyClipWriter:
         self.Q = Queue()
 
         # loop over the frames in the deque and put them in the queue
-        for i in range(len(slef.frames),0,-1):
+        for i in range(len(self.frames), 0, -1):
             self.Q.put(self.frames[i-1])
         
         # start a thread to write frame to video file
@@ -79,4 +79,3 @@ class KeyClipWriter:
         self.flush()
         self.writer.release()
             
-        
