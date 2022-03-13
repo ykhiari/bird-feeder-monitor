@@ -1,0 +1,27 @@
+{
+    "picamera": false,
+    "bg_sub": "GMG",
+    "erode": {
+        "kernel": [
+            3,
+            3
+        ],
+        "iterations": 2
+    },
+    "dilate": {
+        "kernel": [
+            5,
+            5
+        ],
+        "iterations": 3
+    },
+    "min_radius": 80,
+    "keyclipwriter_buffersize": 50,
+    "codec": "MJPG",
+    "write_snaps": true,
+    "frames_between_snaps": 30,
+    "annotate": true,
+    "display": true,
+    "output_path": "output_gmg",
+    "fps": 20
+}
